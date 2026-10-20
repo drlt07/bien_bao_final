@@ -1,0 +1,73 @@
+name: Build Bien Bao AI APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        working-directory: BienBaoAI/2_app_dien_thoai/bien_bao_ai
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Kiểm tra file mô hình
+        run: ls -l assets/model.tflite
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter (cố định phiên bản 3.24.5)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: stable
+          cache: true
+
+      - name: Tạo thư mục android
+        run: flutter create --platforms=android --project-name bien_bao_ai --org vn.khkt .
+
+      - name: Chỉnh cấu hình Android (minSdk 26, proguard cho TensorFlow Lite)
+        run: bash ci/patch_android.sh
+
+      - name: Tải thư viện
+        run: flutter pub get
+
+      - name: Build APK release
+        id: release
+        continue-on-error: true
+        run: flutter build apk --release 2>&1 | tee build_release.log; exit ${PIPESTATUS[0]}
+
+      - name: Build APK debug (dự phòng nếu release lỗi)
+        if: steps.release.outcome != 'success'
+        run: flutter build apk --debug 2>&1 | tee build_debug.log; exit ${PIPESTATUS[0]}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BienBaoAI-Android-APK
+          path: BienBaoAI/2_app_dien_thoai/bien_bao_ai/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload log build (để xem lỗi)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: BienBaoAI/2_app_dien_thoai/bien_bao_ai/build_*.log
+          if-no-files-found: ignore
