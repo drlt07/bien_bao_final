@@ -1,1 +1,59 @@
 
+name: Build Bien Bao AI APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: BienBaoAI/2_app_dien_thoai/bien_bao_ai
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Check Flutter version
+        run: flutter --version
+
+      - name: Create Android platform if missing
+        run: |
+          if [ ! -d android ]; then
+            flutter create --platforms=android .
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BienBaoAI-Android-APK
+          path: BienBaoAI/2_app_dien_thoai/bien_bao_ai/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
